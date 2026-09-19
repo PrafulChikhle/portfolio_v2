@@ -1,0 +1,339 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================================
+   AVIONICS — a 2050 flight-computer console.
+
+   COLOR RATIONALE: Amber phosphor (#ffb000) is the primary signal because every
+   other engineer portfolio reaches for cyan or violet. Amber reads instrument,
+   not arcade — it is the color of a CRT that has been running for forty years.
+   It carries state and live data ONLY; it is never decoration. Ice cyan is the
+   single secondary, reserved for things you can act on (links, hover). Red
+   appears only for genuine alerts. Everything else is graphite and rule lines,
+   so the amber always has somewhere quiet to land.
+
+   MOTION RATIONALE: Nothing merely fades in. Things deploy — panels arrive on
+   rails, lines draw themselves, glyphs resolve out of noise, numbers count up.
+   The page boots like hardware, because the conceit is that you have opened a
+   console on a machine more advanced than yours and it is powering up for you.
+   Everything animated is transform/opacity/filter, everything scroll-bound
+   rides one rAF, and the whole system collapses to instant, legible state
+   changes under prefers-reduced-motion.
+   ========================================================================== */
+
+@layer base {
+  :root {
+    /* substrate */
+    --void: #06070a;
+    --panel: #0a0c10;
+    --panel-2: #0f1218;
+    --panel-3: #151922;
+
+    /* rules & structure */
+    --rule: rgba(255, 176, 0, 0.13);
+    --rule-soft: rgba(255, 255, 255, 0.06);
+    --rule-strong: rgba(255, 176, 0, 0.34);
+
+    /* signal */
+    --sig: #ffb000;
+    --sig-dim: #b07a12;
+    --sig-deep: #5c4109;
+    --sig-glow: rgba(255, 176, 0, 0.42);
+
+    /* secondary — actionable */
+    --ice: #4fd6ff;
+    --ice-dim: #2a7f9e;
+    --ice-glow: rgba(79, 214, 255, 0.35);
+
+    /* alert */
+    --alert: #ff4d3d;
+
+    /* type */
+    --txt: #dde0e6;
+    --txt-dim: #8d939d;
+    --txt-faint: #5a606b;
+
+    --radius: 2px;
+
+    /* shadcn compat — kept so the /components/ui primitives stay usable */
+    --background: 220 20% 4%;
+    --foreground: 220 12% 89%;
+    --card: 220 20% 5%;
+    --card-foreground: 220 12% 89%;
+    --popover: 220 22% 6%;
+    --popover-foreground: 220 12% 89%;
+    --primary: 40 100% 50%;
+    --primary-foreground: 220 30% 4%;
+    --secondary: 220 16% 12%;
+    --secondary-foreground: 220 12% 89%;
+    --muted: 220 16% 11%;
+    --muted-foreground: 220 8% 58%;
+    --accent: 195 100% 65%;
+    --accent-foreground: 220 30% 4%;
+    --destructive: 4 100% 62%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 16% 14%;
+    --input: 220 16% 14%;
+    --ring: 40 100% 50%;
+  }
+
+  * {
+    border-color: var(--rule-soft);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    /* Panels reveal from a horizontal offset, so anything not yet in view sits
+       briefly outside the viewport. `clip` swallows that without creating a
+       scroll container (which `hidden` would, breaking position: sticky). */
+    overflow-x: clip;
+  }
+
+  body {
+    background: var(--void);
+    color: var(--txt);
+    font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-ligatures: none;
+    overflow-x: clip;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--sig);
+    color: #0a0800;
+  }
+
+  /* instrument scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--void); border-left: 1px solid var(--rule); }
+  ::-webkit-scrollbar-thumb { background: var(--sig-deep); border: 2px solid var(--void); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--sig-dim); }
+
+  :focus-visible {
+    outline: 1px solid var(--sig);
+    outline-offset: 3px;
+  }
+
+  /* Native cursor hidden only while the reticle is actually driving — but text
+     fields keep their caret, because hiding it there just breaks typing. */
+  body[data-reticle="on"],
+  body[data-reticle="on"] * {
+    cursor: none !important;
+  }
+  body[data-reticle="on"] input,
+  body[data-reticle="on"] textarea,
+  body[data-reticle="on"] [contenteditable="true"] {
+    cursor: text !important;
+  }
+}
+
+@layer components {
+  /* ---- panel chrome: corner brackets, the core structural motif ---------- */
+  .bracket {
+    position: relative;
+    background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+    border: 1px solid var(--rule);
+  }
+  .bracket::before,
+  .bracket::after {
+    content: "";
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    border: 1px solid var(--sig);
+    opacity: 0.55;
+    pointer-events: none;
+    transition: opacity 0.3s ease, width 0.3s ease, height 0.3s ease;
+  }
+  /* Inset at 0 rather than -1px so the marks survive an `overflow: hidden`
+     or scrolling ancestor. Never pair .bracket with .sweep — both claim
+     ::after on the same element. */
+  .bracket::before { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+  .bracket::after  { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+  .bracket:hover::before,
+  .bracket:hover::after { opacity: 1; width: 15px; height: 15px; }
+
+  /* ---- the small-caps annotation voice ----------------------------------- */
+  .label {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--txt-faint);
+    font-weight: 500;
+  }
+  .label-sig { color: var(--sig-dim); }
+
+  /* ---- hairline measurement grid ---------------------------------------- */
+  .grid-rule {
+    background-image:
+      linear-gradient(var(--rule-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--rule-soft) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  /* ---- specular sweep on hover ------------------------------------------- */
+  .sweep { position: relative; overflow: hidden; }
+  .sweep::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      rgba(255, 176, 0, 0.09) 47%,
+      rgba(255, 255, 255, 0.13) 50%,
+      rgba(255, 176, 0, 0.09) 53%,
+      transparent 70%
+    );
+    transform: translateX(-120%);
+    transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+  }
+  .sweep:hover::after { transform: translateX(120%); }
+
+  /* ---- glitch / RGB split on hover --------------------------------------- */
+  .glitch:hover { animation: rgbsplit 0.34s steps(2, end) 1; }
+
+  /* ---- amber glow, used only on live values ------------------------------ */
+  .glow { text-shadow: 0 0 12px var(--sig-glow); }
+  .glow-ice { text-shadow: 0 0 12px var(--ice-glow); }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .tnum { font-variant-numeric: tabular-nums; }
+}
+
+/* =============================================================================
+   KEYFRAMES
+   ========================================================================== */
+
+@keyframes blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+
+@keyframes scanline {
+  0%   { transform: translate3d(0, -100%, 0); }
+  100% { transform: translate3d(0, 100vh, 0); }
+}
+
+@keyframes radar { to { transform: rotate(360deg); } }
+
+@keyframes rgbsplit {
+  0%   { text-shadow: 0 0 0 transparent; transform: translate3d(0,0,0); }
+  25%  { text-shadow: -2px 0 var(--alert), 2px 0 var(--ice); transform: translate3d(1px,0,0); }
+  50%  { text-shadow: 2px 0 var(--alert), -2px 0 var(--ice); transform: translate3d(-1px,0,0); }
+  75%  { text-shadow: -1px 0 var(--alert), 1px 0 var(--ice); transform: translate3d(1px,0,0); }
+  100% { text-shadow: 0 0 0 transparent; transform: translate3d(0,0,0); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--sig-glow); }
+  50%      { opacity: 0.6; box-shadow: 0 0 0 5px rgba(255, 176, 0, 0); }
+}
+
+@keyframes marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 0.035; }
+  47%      { opacity: 0.035; }
+  48%      { opacity: 0.06; }
+  49%      { opacity: 0.025; }
+  50%      { opacity: 0.05; }
+}
+
+/* overlays ------------------------------------------------------------------ */
+.fx-grain {
+  position: fixed;
+  inset: -50%;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: flicker 6s steps(1, end) infinite;
+}
+
+.fx-scan {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, transparent 0 2px, rgba(0, 0, 0, 0.32) 2px 4px);
+  opacity: 0.4;
+  mix-blend-mode: multiply;
+}
+
+.fx-sweep-line {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 96px;
+  z-index: 58;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(255, 176, 0, 0.055), transparent);
+  animation: scanline 7s linear infinite;
+}
+
+.fx-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 57;
+  pointer-events: none;
+  background: radial-gradient(ellipse 120% 90% at 50% 45%, transparent 40%, rgba(0, 0, 0, 0.78) 100%);
+}
+
+/* =============================================================================
+   KONAMI — "wireframe" render mode. The machine drops its skin.
+   ========================================================================== */
+body[data-mode="wireframe"] .bracket,
+body[data-mode="wireframe"] section,
+body[data-mode="wireframe"] article,
+body[data-mode="wireframe"] header,
+body[data-mode="wireframe"] a,
+body[data-mode="wireframe"] button,
+body[data-mode="wireframe"] li,
+body[data-mode="wireframe"] img {
+  outline: 1px solid rgba(79, 214, 255, 0.45) !important;
+  outline-offset: -1px;
+}
+/* !important because Tailwind's group-hover:grayscale-* variants carry higher
+   specificity (0,2,0) than this selector and would otherwise win on hover,
+   dropping the image out of wireframe mode mid-interaction. */
+body[data-mode="wireframe"] img {
+  filter: invert(1) hue-rotate(180deg) saturate(0.35) !important;
+}
+body[data-mode="wireframe"] {
+  --sig: #4fd6ff;
+  --sig-dim: #2a7f9e;
+  --sig-glow: rgba(79, 214, 255, 0.4);
+  --rule: rgba(79, 214, 255, 0.18);
+}
+
+/* =============================================================================
+   REDUCED MOTION — kill ambient motion, keep every state change legible.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .fx-grain,
+  .fx-scan,
+  .fx-sweep-line { display: none; }
+
+  .sweep::after { display: none; }
+
+  body[data-reticle="on"],
+  body[data-reticle="on"] * { cursor: auto !important; }
+  body[data-reticle="on"] input,
+  body[data-reticle="on"] textarea { cursor: text !important; }
+}
